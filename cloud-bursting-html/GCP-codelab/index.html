@@ -1,0 +1,1041 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Cloud Bursting via Slurm Federated Clusters</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid=""
+                  id="cloud-bursting-codelab"
+                  title="Cloud Bursting via Slurm Federated Clusters"
+                  environment="web"
+                  feedback-link="">
+    
+      <google-codelab-step label="Overview" duration="0">
+        <p>This lab updates the original codelab called <a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-federated-on-gcp" target="_blank">Building Federated HPC Clusters with Slurm</a>. This update is necessary for a couple of reasons:</p>
+<ul>
+<li>The original codelab did not contain complete information and as a result was difficult for novices to follow</li>
+<li>The Google Cloud Platform Console interface had been updated, resulting in divergence between the lab and the platform that can easily trip up students</li>
+</ul>
+<p>I renamed this codelab to Cloud Bursting via Federated Slurm Clusters because this is the relevant end goal for my Center and for many other academic computing centers. Credit for this lab should extend to the original creators. As you can see, I shamelessly borrowed from the original and enhanced it where I see the need. If you discover areas that need improvement, please send it my way and I&#39;ll do my best to incorporate suggestions.  Let&#39;s begin.</p>
+<p>Welcome to the Google Codelab for creating two federated Slurm clusters on Google Cloud Platform! By the end of this cloud lab you should have a solid understanding of the ease of provisioning and configuring Slurm clusters with federation, and submitting jobs between clusters.</p>
+<p class="image-container"><img style="width: 312.00px" src="img/c16fa310c142ac6f.png"></p>
+<p>Google Cloud teamed up with<a href="https://www.schedmd.com/" target="_blank">SchedMD</a> to release a set of tools that make it easier to launch the Slurm workload manager on Compute Engine, and to expand your existing cluster when you need extra resources. This integration was built by the experts at<a href="https://www.schedmd.com/" target="_blank">SchedMD</a> in accordance with Slurm best practices.</p>
+<p>If you&#39;re planning on using the<a href="https://github.com/SchedMD/slurm/tree/master/contribs/gcp" target="_blank">Slurm on Google Cloud Platform</a> integrations, or if you have any questions, please consider joining our<a href="https://groups.google.com/forum/#!forum/google-cloud-slurm-discuss" target="_blank">Google Cloud &amp; Slurm Community Discussion Group</a>!</p>
+<h2 is-upgraded><strong>About Slurm</strong></h2>
+<p>Slurm is one of the leading workload managers for HPC clusters around the world. Slurm provides an open-source, fault-tolerant, and highly-scalable workload management and job scheduling system for small and large Linux clusters. Slurm requires no kernel modifications for its operation and is relatively self-contained. As a cluster workload manager, Slurm has three key functions:</p>
+<p>1. It allocates exclusive or non-exclusive access to resources (compute nodes) to users for some duration of time so they can perform work.</p>
+<p>2. It provides a framework for starting, executing, and monitoring work (normally a parallel job) on the set of allocated nodes.</p>
+<p>3. It arbitrates contention for resources by managing a queue of pending work.</p>
+<aside class="special"><p><strong>Learn More About Slurm</strong></p>
+<ul>
+<li><a href="https://www.schedmd.com/" target="_blank">SchedMD Homepage</a></li>
+<li><a href="https://github.com/SchedMD/slurm/blob/master/contribs/gcp/README.md" target="_blank">Slurm on GCP ReadMe</a></li>
+<li><a href="https://slurm.schedmd.com/quickstart.html" target="_blank">Slurm Quickstart Guide</a></li>
+<li><a href="https://slurm.schedmd.com/man_index.html" target="_blank">Slurm MAN Pages</a></li>
+<li><a href="https://slurm.schedmd.com/pdfs/summary.pdf" target="_blank">Slurm Command Summary</a> (PDF)</li>
+<li><a href="https://slurm.schedmd.com/accounting.html" target="_blank">Slurm Accounting Guide</a></li>
+<li><a href="https://slurm.schedmd.com/troubleshoot.html" target="_blank">Slurm Troubleshooting Guide</a></li>
+<li><a href="https://groups.google.com/forum/#!forum/slurm-users" target="_blank">Slurm Users Discussion Group</a></li>
+</ul>
+</aside>
+<h2 class="checklist" is-upgraded><strong>What you&#39;ll learn</strong></h2>
+<ul class="checklist">
+<li>How to use the GCP Deployment Manager Service</li>
+<li>How to run a job using SLURM</li>
+<li>How to query cluster information and monitor running jobs in SLURM</li>
+<li>How to create a federation between two clusters and submit federated jobs</li>
+<li>Where to find help with Slurm</li>
+</ul>
+<h2 is-upgraded><strong>Prerequisites</strong></h2>
+<ul>
+<li>Google Cloud Platform Account and a Project with Billing</li>
+<li>Basic Linux Experience</li>
+<li>Completed the &#34;<a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a>&#34; codelab</li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Seeing the Big Picture" duration="0">
+        <h2 is-upgraded><strong>Why federate Slurm clusters?</strong></h2>
+<p>Many users have existing clusters in their environment, either on-premise with user-managed hardware, or already running in Google Cloud Platform. In these cases many users want to supplement their existing resources with burstable cloud-based nodes, possibly in different regions, and with different hardware or software configurations. This use case is solved by using Slurm&#39;s federation capabilities alongside the new Slurm Auto-Scaling capabilities in Google Cloud Platform.  The basic architectural diagram of two federated Slurm Clusters in Google Cloud Platform is shown below.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/6e62315487c4d73b.png"></p>
+<p>In order to test Slurm&#39;s federation capabilities in Google Cloud Platform we&#39;ll need to set up two clusters, one called <strong>on-prem</strong> and the other called <strong>gcp-burst</strong>.  The two clusters will exist in their own project and have <strong>different slurm-network subnet range</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>on-prem</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.10.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>gcp-burst</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+</table>
+<p>For this codelab we will use a cross-project VPN, and we will use internal IPs. Customers may use external IPs as well. This is detailed in the <a href="https://github.com/SchedMD/slurm-gcp/blob/master/README.md" target="_blank">Slurm on GCP Readme</a>.  The VPN permits Slurm on the <strong>on-prem</strong> cluster to federate jobs to the <strong>gcp-burst</strong> cluster.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Deploying the on-prem cluster" duration="0">
+        <h2 is-upgraded>Our goal.</h2>
+<p>We want to provision a cluster that represents our on-premise cluster. This deployment is representative of on-premise because it will be in its own network space and will have the following subnet ranges 10.10.0.0/16.  The following sections follow the codelab &#34;<a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a>&#34;.</p>
+<h2 is-upgraded>Create a new project called on-prem</h2>
+<p>From the Google Cloud Console, click on <strong>Select a project</strong> → <strong>NEW PROJECT</strong>. Let&#39;s name it on-prem and provision it by clicking the <strong>CREATE</strong> button.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/de5bff5b6c623121.png"></p>
+<p class="image-container"><img style="width: 530.40px" src="img/fac73e5619af9e9f.png"></p>
+<h2 is-upgraded><strong>Configure the VPC Network</strong></h2>
+<p>Next, we will configure the VPC with the subnet range 10.10.0.0/16. If you have other projects under your account, make sure that the current one selected is called <strong>on-prem</strong>. Click on the Google Cloud Console hamburger icon (the three horizontal lines on the far left) and navigate to the NETWORKING section <strong>VPC network </strong>→ <strong>VPC networks</strong>.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/6dc5a799b0b9bc1b.png"></p>
+<p>Click on <strong>+CREATE VPC NETWORK</strong>, name it <em>on-prem</em>, set the Subnet creation mode to <em>custom</em>, name the subnet as <em>slurm-network</em>, set the IP address range to <em>10.10.0.0/16</em>, and then click the <strong>CREATE</strong> button.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/47d784ed3687961e.png"></p>
+<p class="image-container"><img style="width: 530.40px" src="img/3500ffc4d7d88436.png"></p>
+<h2 is-upgraded><strong>Configure the Firewall Rules</strong></h2>
+<p>Next we will configure the necessary firewall rules for the on-prem VPC network.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/c240cbab435d90f1.png"></p>
+<p class="image-container"><img style="width: 624.00px" src="img/bb3ce7a2c75619fc.png"></p>
+<p class="image-container"><img style="width: 624.00px" src="img/11db328c55796b19.png"><img style="width: 624.00px" src="img/8ada47fdf90fbab4.png"><img style="width: 624.00px" src="img/c2fff0b42ba594ac.png"><img style="width: 624.00px" src="img/4b153f30f0b38e94.png"></p>
+<h2 is-upgraded><strong>Configure the NAT Gateway</strong></h2>
+<p>Next we will configure the NAT Gateway to provide the on-prem VPC network access to the internet. From the Google Cloud Console hamburger menu, navigate to the NETWORKING <strong>Network services</strong> → <strong>Cloud NAT</strong> panel. Click on <strong>+CREATE NAT GATEWAY</strong> and fill in the field using the following information:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Gateway name </strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem-us-central1-gateway</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>VPC network</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Cloud Router</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem-us-central1-router</p>
+</td></tr>
+</table>
+<p>Leave the remaining fields in the default setting and click on the <strong>CREATE</strong> button.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/d5fad8e9530273f3.png"><img style="width: 624.00px" src="img/c9a57cf23a2b11e6.png"><img style="width: 624.00px" src="img/a926f91dc773b1a3.png"></p>
+<h2 is-upgraded><strong>Provision the on-prem cluster</strong></h2>
+<p>Next we will deploy the <strong>on-prem</strong> Slurm cluster using the deployment manager scripts as described in the &#34;<a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a>&#34; codelab. When deployed, the login node, controller, and image nodes will show up as VM instances under Compute Engine.  Let us start by navigating to the [Compute]<strong> Compute Engine</strong> → <strong>VM instances panel</strong>. </p>
+<p class="image-container"><img style="width: 624.00px" src="img/726f9440d1e26ce0.png"></p>
+<p>Click on the <strong>Activate Cloud Shell icon</strong> on the upper right side of the toolbar. This will bring up a commandline interface to the <strong>on-prem</strong> project.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/b6b7330e33ed1561.png"></p>
+<p>Next, we will clone the deployment-manager files and cd into the directory to modify the deployment configuration YAML file <strong>slurm-cluster.yaml</strong>.  You can use your typical command line editors, such as vi, nano, or emacs or use the Cloud Console Code Editor <img style="width: 87.75px" src="img/373bb0f74110d3dc.png"> to modify the file.</p>
+<pre>git clone https://github.com/SchedMD/slurm-gcp.git on-prem
+cd on-prem
+vi slurm-cluster.yaml</pre>
+<p class="image-container"><img style="width: 624.00px" src="img/4a39b7d56c56db5c.png"></p>
+<p>Modify the slurm-cluster.yaml file with the following parameters (be sure to uncomment the <strong>vpc_net</strong> and <strong>vpc_subnet</strong> lines):</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>cluster_name</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>zone</strong></p>
+</td><td colspan="1" rowspan="1"><p>us-central1-b</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>vpc_net</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>vpc_subnet</strong></p>
+</td><td colspan="1" rowspan="1"><p>slurm-network</p>
+</td></tr>
+</table>
+<p>Additionally, change the name of the first partition from <strong>debug</strong> to <strong>test</strong> and uncomment the block under <strong># Additional partition</strong> and update the values as follows:</p>
+<pre>    # Additional partition
+
+      - name           : smp
+        machine_type   : n1-standard-64
+        max_node_count : 42
+        zone           : us-central1-b</pre>
+<p>The full modified <strong>slurm-cluster.yaml</strong> file should look like the following:</p>
+<pre># Copyright 2017 SchedMD LLC.
+# Modified for use with the Slurm Resource Manager.
+#
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an &#34;AS IS&#34; BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# [START cluster_yaml]
+imports:
+- path: slurm.jinja
+
+resources:
+- name: slurm-cluster
+  type: slurm.jinja
+  properties:
+    cluster_name            : on-prem
+
+    zone                    : us-central1-b
+
+  # Optional network configuration fields
+  # READ slurm.jinja.schema for prerequisites
+    vpc_net                   : on-prem
+    vpc_subnet                : slurm-network
+    # shared_vpc_host_project   : &lt; my-shared-vpc-project-name &gt;
+
+    controller_machine_type : n1-standard-2
+    # controller_disk_type      : pd-standard
+    # controller_disk_size_gb   : 50
+    # external_controller_ip    : False
+    # controller_labels         :
+    #   key1 : value1
+    #   key2 : value2
+    # controller_service_account: default
+    # controller_scopes         :
+    # - https://www.googleapis.com/auth/cloud-platform
+    # cloudsql                  :
+    #   server_ip: &lt;cloudsql ip&gt;
+    #   user: slurm
+    #   password: verysecure
+    #   # Optional
+    #   db_name: slurm_accounting
+
+    login_machine_type        : n1-standard-2
+    # login_disk_type           : pd-standard
+    # login_disk_size_gb        : 20
+    # external_login_ips        : False
+    # login_labels              :
+    #   key1 : value1
+    #   key2 : value2
+    # login_node_count          : 0
+    # login_node_service_account: default
+    # login_node_scopes         :
+    # - https://www.googleapis.com/auth/devstorage.read_only
+    # - https://www.googleapis.com/auth/logging.write
+
+  # Optional network storage fields
+  # network_storage is mounted on all instances
+  # login_network_storage is mounted on controller and login instances
+    # network_storage           :
+    #   - server_ip: &lt;storage host&gt;
+    #     remote_mount: /home
+    #     local_mount: /home
+    #     fs_type: nfs
+    # login_network_storage     :
+    #   - server_ip: &lt;storage host&gt;
+    #     remote_mount: /net_storage
+    #     local_mount: /shared
+    #     fs_type: nfs
+
+    compute_image_machine_type  : n1-standard-2
+    # compute_image_disk_type   : pd-standard
+    # compute_image_disk_size_gb: 20
+    # compute_image_labels      :
+    #   key1 : value1
+    #   key2 : value2
+
+  # Optional compute configuration fields
+    # external_compute_ips      : False
+    # private_google_access     : True
+
+    # controller_secondary_disk         : True
+    # controller_secondary_disk_type    : pd-standard
+    # controller_secondary_disk_size_gb : 300
+
+    # compute_node_service_account : default
+    # compute_node_scopes          :
+    #   -  https://www.googleapis.com/auth/devstorage.read_only
+    #   -  https://www.googleapis.com/auth/logging.write
+
+    # Optional timer fields
+    # suspend_time              : 300
+
+    # slurm_version             : 19.05-latest
+    # ompi_version              : v3.1.x
+
+    partitions :
+      - name              : test
+        machine_type      : n1-standard-2
+        max_node_count    : 10
+        zone              : us-central1-a
+
+    # Optional compute configuration fields
+
+        # cpu_platform           : Intel Skylake
+        # preemptible_bursting   : False
+        # compute_disk_type      : pd-standard
+        # compute_disk_size_gb   : 20
+        # compute_labels         :
+        #   key1 : value1
+        #   key2 : value2
+        # compute_image_family   : custom-image
+
+    # Optional network configuration fields
+        # vpc_subnet                : default
+
+    # Optional GPU configuration fields
+
+        # gpu_type               : nvidia-tesla-v100
+        # gpu_count              : 8
+
+
+    # Additional partition
+
+      - name           : smp
+        machine_type   : n1-standard-64
+        max_node_count : 42
+        zone           : us-central1-b
+
+    # Optional compute configuration fields
+
+        # cpu_platform           : Intel Skylake
+        # preemptible_bursting   : False
+        # compute_disk_type      : pd-standard
+        # compute_disk_size_gb   : 20
+        # compute_labels         :
+        #   key1 : value1
+        #   key2 : value2
+        # compute_image_family   : custom-image
+        # network_storage        :
+        #   - server_ip: none
+        #     remote_mount: &lt;gcs bucket name&gt;
+        #     local_mount: /data
+        #     fs_type: gcsfuse
+        #     mount_options: file_mode=664,dir_mode=775,allow_other
+        #
+
+    # Optional network configuration fields
+        # vpc_subnet                : my-subnet
+
+    # Optional GPU configuration fields
+        # gpu_type               : nvidia-tesla-v100
+        # gpu_count              : 8
+
+#  [END cluster_yaml]</pre>
+<p>Next we will use gcloud to provision the cluster. Within the Cloud Shell, execute the following command to deploy a Slurm cluster using our updated configuration specifications:</p>
+<pre>gcloud deployment-manager deployments create on-prem1 --config slurm-cluster.yaml</pre>
+<p><strong>Note:</strong> If you&#39;re running this codelab in a new project you may be prompted to enable the Deployment Manager API with a message like this:</p>
+<p>API [deploymentmanager.googleapis.com] not enabled on project</p>
+<p>[956620689341]. Would you like to enable and retry? (y/N)?</p>
+<p>If you get this prompt enter <strong>Y </strong>and press <strong>enter</strong> to continue.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/d940d0c6ea70c655.png"></p>
+<p>The deployment takes several minutes to complete.  If everything goes according to plan without error, you should see four VM instances: a login node, a controller node, a compute image node corresponding to the <strong>test</strong> partition and a compute image node corresponding to the <strong>smp</strong> partition.  To login into on-prem-login0 VM, you can either click on the <strong>SSH</strong> link under the Connect column or issue this command within the Cloud Shell</p>
+<pre>gcloud compute ssh on-prem-login0 --zone=us-central1-b</pre>
+<p class="image-container"><img style="width: 624.00px" src="img/5cc88d14910b4dd3.png"></p>
+<p>The initial login into the on-prem cluster will trigger installation and configuration of Slurm. This process takes several minutes, so now is a good time to take a break.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/e02ce8a72dd98af7.png"></p>
+<p>Now that Slurm is installed, log out and log back into the cluster. You first will need to <strong>CTRL+C</strong> out of the process followed by the <strong>exit</strong> command. The Slurm banner should greet you upon successful login. If the Slurm <strong>sinfo</strong> command outputs the partitions as specified  in the <strong>slurm-cluster.yaml</strong> file (with 10 nodes for the <strong>test</strong> partition and 42 nodes for the <strong>smp</strong> partition), our <strong>on-prem</strong> cluster has been successfully deployed. Note that the IPs for the four VM instances are within the 10.10.0.x block, as specified in the <strong>slurm-network</strong> VPC subnet.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/5f0be4f346275fe2.png"></p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Deploying the gcp-burst cluster" duration="3">
+        <h2 is-upgraded><strong>Our goal.</strong></h2>
+<p>We want to provision a cluster that represents our cloud resource. This deployment is representative of a cloud resource because it will be in its own network space distinct from the <strong>on-prem</strong> cluster and will have the following subnet ranges 10.20.0.0/16.  The following sections follow the codelab &#34;<a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a>&#34; and especially the previous topic <strong>Deploying the on-prem cluster</strong>.</p>
+<h2 is-upgraded><strong>Create a new project called gcp-burst</strong></h2>
+<p>From the Google Cloud Console, click on <strong>Select a project</strong> → <strong>NEW PROJECT</strong>. Let&#39;s name it on-prem and provision it by clicking the <strong>CREATE</strong> button.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/9a57ef651ddaa881.png"></p>
+<p class="image-container"><img style="width: 530.40px" src="img/35b981f40870060c.png"></p>
+<h2 is-upgraded><strong>Configure the VPC Network</strong></h2>
+<p>Next, we will configure the VPC with the subnet range 10.20.0.0/16. If you have other projects under your account, make sure that the current one selected is called <strong>gcp-burst</strong>. Click on the Google Cloud Console hamburger icon and navigate to the NETWORKING section <strong>VPC network </strong>→ <strong>VPC networks</strong>.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/ac570dfbe2f90c84.png"></p>
+<p>Click on <strong>+CREATE VPC NETWORK</strong>, name it <em>gcp-burst</em>, set the Subnet creation mode to <em>custom</em>, name the subnet as <em>slurm-network</em>, set the IP address range to <em>10.20.0.0/16</em>, and then click the <strong>CREATE</strong> button.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/2175693ecbe3d97e.png"></p>
+<p class="image-container"><img style="width: 624.00px" src="img/227711a8f55becb.png"></p>
+<h2 is-upgraded><strong>Configure the Firewall Rules</strong></h2>
+<p>Next we will configure the necessary firewall rules for the on-prem VPC network.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/d14f91dd2060a708.png"><img style="width: 624.00px" src="img/33ad0004ebe4de6a.png"><img style="width: 624.00px" src="img/33c79c9203e61071.png"><img style="width: 624.00px" src="img/f3209f76b40481f0.png"><img style="width: 624.00px" src="img/f66b1efbbb100ebd.png"><img style="width: 624.00px" src="img/76813574e5437b08.png"><img style="width: 624.00px" src="img/848ce8566d2e4ae7.png"></p>
+<h2 is-upgraded><strong>Configure the NAT Gateway</strong></h2>
+<p>Next we will configure the NAT Gateway to provide the gcp-burst VPC network access to the internet. From the Google Cloud Console hamburger menu, navigate to the [NETWORKING] <strong>Network services</strong> → <strong>Cloud NAT</strong> panel. Click on <strong>+CREATE NAT GATEWAY</strong> and fill in the field using the following information:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Gateway name </strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst-us-central1-gateway</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>VPC network</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Cloud Router</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst-us-central1-router</p>
+</td></tr>
+</table>
+<p>Leave the remaining fields in the default setting and click on the <strong>CREATE</strong> button.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/ea6a8859809b49b6.png"><img style="width: 624.00px" src="img/7ea720249070caea.png"><img style="width: 624.00px" src="img/d939967f16c582ac.png"></p>
+<h2 is-upgraded><strong>Provision the gcp-burst cluster</strong></h2>
+<p>Next we will deploy the <strong>on-prem</strong> Slurm cluster using the deployment manager scripts as described in the &#34;<a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a>&#34; codelab. When deployed, the login node, controller, and image nodes will show up as VM instances under Compute Engine.  Let us start by navigating to the [Compute]<strong> Compute Engine</strong> → <strong>VM instances panel</strong>. </p>
+<p class="image-container"><img style="width: 624.00px" src="img/e467b4b53fb2dfdb.png"></p>
+<p>Click on the <strong>Activate Cloud Shell icon</strong> on the upper right side of the toolbar. This will bring up a commandline interface to the <strong>gcp-burst</strong> project.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/1e90cdf018a7039.png"></p>
+<p>Next, we will clone the deployment-manager files and cd into the directory to modify the deployment configuration YAML file <strong>slurm-cluster.yaml</strong>.  You can use your typical command line editors, such as vi, nano, or emacs or use the Cloud Console Code Editor <img style="width: 87.75px" src="img/373bb0f74110d3dc.png"> to modify the file.</p>
+<pre>git clone https://github.com/SchedMD/slurm-gcp.git gcp-burst
+cd gcp-burst
+vi slurm-cluster.yaml</pre>
+<p class="image-container"><img style="width: 624.00px" src="img/49e7ea2ffb1b94c2.png"></p>
+<p>Modify the slurm-cluster.yaml file with the following parameters (be sure to uncomment the <strong>vpc_net</strong> and <strong>vpc_subnet</strong> lines):</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>cluster_name</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>zone</strong></p>
+</td><td colspan="1" rowspan="1"><p>us-central1-b</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>vpc_net</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>vpc_subnet</strong></p>
+</td><td colspan="1" rowspan="1"><p>slurm-network</p>
+</td></tr>
+</table>
+<p>Additionally, uncomment the <strong>ompi_version</strong> line and modify the partitions to specify ones for <strong>gpu-k80</strong> and <strong>gpu-v100</strong>.  The configuration snippets are</p>
+<pre>      partitions :
+      - name              : gpu-k80
+        machine_type      : n1-standard-16
+        max_node_count    : 20
+        zone              : us-central1-b</pre>
+<p>and</p>
+<pre>    # Additional partition
+
+      - name           : gpu-v100
+        machine_type   : n1-standard-32
+        max_node_count : 10
+        zone           : us-central1-b</pre>
+<p>The full modified <strong>slurm-cluster.yaml</strong> file should look like the following:</p>
+<pre># Copyright 2017 SchedMD LLC.
+# Modified for use with the Slurm Resource Manager.
+#
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an &#34;AS IS&#34; BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# [START cluster_yaml]
+imports:
+- path: slurm.jinja
+
+resources:
+- name: slurm-cluster
+  type: slurm.jinja
+  properties:
+    cluster_name            : gcp-burst
+
+    zone                    : us-central1-b
+
+  # Optional network configuration fields
+  # READ slurm.jinja.schema for prerequisites
+    vpc_net                   : gcp-burst
+    vpc_subnet                : slurm-network
+    # shared_vpc_host_project   : &lt; my-shared-vpc-project-name &gt;
+
+    controller_machine_type : n1-standard-2
+    # controller_disk_type      : pd-standard
+    # controller_disk_size_gb   : 50
+    # external_controller_ip    : False
+    # controller_labels         :
+    #   key1 : value1
+    #   key2 : value2
+    # controller_service_account: default
+    # controller_scopes         :
+    # - https://www.googleapis.com/auth/cloud-platform
+    # cloudsql                  :
+    #   server_ip: &lt;cloudsql ip&gt;
+    #   user: slurm
+    #   password: verysecure
+    #   # Optional
+    #   db_name: slurm_accounting
+
+    login_machine_type        : n1-standard-2
+    # login_disk_type           : pd-standard
+    # login_disk_size_gb        : 20
+    # external_login_ips        : False
+    # login_labels              :
+    #   key1 : value1
+    #   key2 : value2
+    # login_node_count          : 0
+    # login_node_service_account: default
+    # login_node_scopes         :
+    # - https://www.googleapis.com/auth/devstorage.read_only
+    # - https://www.googleapis.com/auth/logging.write
+
+  # Optional network storage fields
+  # network_storage is mounted on all instances
+  # login_network_storage is mounted on controller and login instances
+    # network_storage           :
+    #   - server_ip: &lt;storage host&gt;
+    #     remote_mount: /home
+    #     local_mount: /home
+    #     fs_type: nfs
+    # login_network_storage     :
+    #   - server_ip: &lt;storage host&gt;
+    #     remote_mount: /net_storage
+    #     local_mount: /shared
+    #     fs_type: nfs
+
+    compute_image_machine_type  : n1-standard-2
+    # compute_image_disk_type   : pd-standard
+    # compute_image_disk_size_gb: 20
+    # compute_image_labels      :
+    #   key1 : value1
+    #   key2 : value2
+
+  # Optional compute configuration fields
+    # external_compute_ips      : False
+    # private_google_access     : True
+
+    # controller_secondary_disk         : True
+    # controller_secondary_disk_type    : pd-standard
+    # controller_secondary_disk_size_gb : 300
+
+    # compute_node_service_account : default
+    # compute_node_scopes          :
+    #   -  https://www.googleapis.com/auth/devstorage.read_only
+    #   -  https://www.googleapis.com/auth/logging.write
+
+    # Optional timer fields
+    # suspend_time              : 300
+
+    # slurm_version             : 19.05-latest
+    ompi_version              : v3.1.x
+
+    partitions :
+      - name              : gpu-k80
+        machine_type      : n1-standard-16
+        max_node_count    : 20
+        zone              : us-central1-b
+
+    # Optional compute configuration fields
+
+        # cpu_platform           : Intel Skylake
+        # preemptible_bursting   : False
+        # compute_disk_type      : pd-standard
+        # compute_disk_size_gb   : 20
+        # compute_labels         :
+        #   key1 : value1
+        #   key2 : value2
+        # compute_image_family   : custom-image
+
+    # Optional network configuration fields
+        # vpc_subnet                : default
+
+    # Optional GPU configuration fields
+
+        gpu_type               : nvidia-tesla-k80
+        gpu_count              : 4
+
+
+    # Additional partition
+
+      - name           : gpu-v100
+        machine_type   : n1-standard-32
+        max_node_count : 10
+        zone           : us-central1-b
+
+    # Optional compute configuration fields
+
+        # cpu_platform           : Intel Skylake
+        # preemptible_bursting   : False
+        # compute_disk_type      : pd-standard
+        # compute_disk_size_gb   : 20
+        # compute_labels         :
+        #   key1 : value1
+        #   key2 : value2
+        # compute_image_family   : custom-image
+        # network_storage        :
+        #   - server_ip: none
+        #     remote_mount: &lt;gcs bucket name&gt;
+        #     local_mount: /data
+        #     fs_type: gcsfuse
+        #     mount_options: file_mode=664,dir_mode=775,allow_other
+        #
+
+    # Optional network configuration fields
+        # vpc_subnet                : my-subnet
+
+    # Optional GPU configuration fields
+        gpu_type               : nvidia-tesla-v100
+        gpu_count              : 8
+
+#  [END cluster_yaml]</pre>
+<p>Next we will use gcloud to provision the cluster. Within the Cloud Shell, execute the following command to deploy a Slurm cluster using our updated configuration specifications:</p>
+<pre>gcloud deployment-manager deployments create gcp-burst1 --config slurm-cluster.yaml</pre>
+<p><strong>Note:</strong> If you&#39;re running this codelab in a new project you may be prompted to enable the Deployment Manager API with a message like this:</p>
+<p>API [deploymentmanager.googleapis.com] not enabled on project</p>
+<p>[956620689341]. Would you like to enable and retry? (y/N)?</p>
+<p>If you get this prompt enter <strong>Y </strong>and press <strong>enter</strong> to continue.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/257253d3f6d46d46.png"></p>
+<p>The deployment takes several minutes to complete.  If everything goes according to plan without error, you should see four VM instances: a login node, a controller node, a compute image node corresponding to the <strong>gpu-k80</strong> partition and a compute image node corresponding to the <strong>gpu-v100</strong> partition.  To login into gcp-burst-login0 VM, you can either click on the <strong>SSH</strong> link under the Connect column or issue this command within the Cloud Shell</p>
+<pre>gcloud compute ssh gcp-burst-login0 --zone=us-central1-b</pre>
+<p>The initial login into the gcp-burst cluster will trigger installation and configuration of Slurm. This process takes several minutes, so now is a good time to take another break.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/66c9bc32da796e28.png"></p>
+<p>Now that Slurm is installed, log out and log back into the cluster. You first will need to <strong>CTRL+C</strong> out of the process followed by the <strong>exit</strong> command. The Slurm banner should greet you upon successful login. If the Slurm <strong>sinfo</strong> command outputs the partitions as specified  in the <strong>slurm-cluster.yaml</strong> file (with 20 nodes for the <strong>gpu-k80</strong> partition and 10 nodes for the <strong>gpu-v100</strong> partition), our <strong>gcp-burst</strong> cluster has been successfully deployed. Note that the IPs for the four VM instances are within the 10.20.0.x block, as specified earlier in the <strong>slurm-network</strong> VPC subnet of the <strong>gpc-burst</strong> VPC network.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Setting Up Cross-Project Firewall Rules" duration="3">
+        <h2 is-upgraded><strong>Our Goal</strong></h2>
+<p>Once you have a second project with a second &#34;gcp&#34; Slurm cluster deployed through deployment manager, we can set up the networking in preparation for federating the on-prem and gcp clusters.</p>
+<p>We must first <strong>open ports</strong> using Firewall Rules on both projects.</p>
+<h2 is-upgraded><strong>Firewall changes for on-prem cluster</strong></h2>
+<h3 is-upgraded><strong><code>slurmctl ports:</code></strong></h3>
+<p>We need to open ports on the on-prem VPC network so that the gcp-burst cluster can communicate with the on-prem cluster&#39;s slurmctld (tcp:6817) and slurmdbd (tcp:6819).</p>
+<p>From the Google Cloud Console hamburger menu, navigate to [NETWORKING] <strong>VPC network</strong> → <strong>Firewall</strong> panel. Click on <strong>+CREATE FIREWALL RULE</strong> at the top of the page, fill in with following fields and click on <strong>CREATE</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>slurm-network</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Priority</strong></p>
+</td><td colspan="1" rowspan="1"><p>1000</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Direction of traffic</strong></p>
+</td><td colspan="1" rowspan="1"><p>Ingress</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Action to match</strong></p>
+</td><td colspan="1" rowspan="1"><p>Allow</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Targets</strong></p>
+</td><td colspan="1" rowspan="1"><p>Specified target tags</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Target tags</strong></p>
+</td><td colspan="1" rowspan="1"><p>controller</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source Filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>IP ranges</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source IP ranges</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Second source filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>none</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Specified protocols and ports</strong></p>
+</td><td colspan="1" rowspan="1"><p>tcp:6817,6819</p>
+</td></tr>
+</table>
+<h2 is-upgraded><img style="width: 624.00px" src="img/c3a63e32d75027a2.png"><img style="width: 624.00px" src="img/57dab612dbb2023e.png"></h2>
+<h3 is-upgraded><strong><code>slurmd ports:</code></strong></h3>
+<p>From the Google Cloud Console hamburger menu, navigate to [NETWORKING] <strong>VPC network</strong> → <strong>Firewall</strong> panel. Click on <strong>+CREATE FIREWALL RULE</strong> at the top of the page, fill in with following fields and click on <strong>CREATE</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>slurmd</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Priority</strong></p>
+</td><td colspan="1" rowspan="1"><p>1000</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Direction of traffic</strong></p>
+</td><td colspan="1" rowspan="1"><p>Ingress</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Action to match</strong></p>
+</td><td colspan="1" rowspan="1"><p>Allow</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Targets</strong></p>
+</td><td colspan="1" rowspan="1"><p>Specified target tags</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Target tags</strong></p>
+</td><td colspan="1" rowspan="1"><p>compute</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source Filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>IP ranges</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source IP ranges</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Second source filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>none</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Specified protocols and ports</strong></p>
+</td><td colspan="1" rowspan="1"><p>tcp:6818</p>
+</td></tr>
+</table>
+<h2 is-upgraded><img style="width: 624.00px" src="img/dbba76972138a3c9.png"><img style="width: 624.00px" src="img/28a9f3d7b5be7042.png"></h2>
+<h3 is-upgraded><strong><code>srun ports:</code></strong></h3>
+<p>Optionally, if you require the ability to execute cross-cluster srun jobs, or cross-cluster interactive jobs then ports need to be opened for srun to be able to communicate with the slurmd&#39;s on the gcp cluster. Ports also need to be opened for the slurmd&#39;s to be able to talk back to the login nodes on the gcp cluster. During these operations srun opens several ephemeral ports for communications. It&#39;s recommended to define which ports srun can use when using a firewall. This is done by defining SrunPortRange=&lt;IP Range&gt; in both slurm.conf files.</p>
+<p>SrunPortRange=60001-63000</p>
+<p>From the Google Cloud Console hamburger menu, navigate to [NETWORKING] <strong>VPC network</strong> → <strong>Firewall</strong> panel. Click on <strong>+CREATE FIREWALL RULE</strong> at the top of the page, fill in with following fields and click on <strong>CREATE</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>srun</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Priority</strong></p>
+</td><td colspan="1" rowspan="1"><p>1000</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Direction of traffic</strong></p>
+</td><td colspan="1" rowspan="1"><p>Ingress</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Action to match</strong></p>
+</td><td colspan="1" rowspan="1"><p>Allow</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Targets</strong></p>
+</td><td colspan="1" rowspan="1"><p>Specified target tags</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Target tags</strong></p>
+</td><td colspan="1" rowspan="1"><p>compute</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source Filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>IP ranges</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source IP ranges</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Second source filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>none</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Specified protocols and ports</strong></p>
+</td><td colspan="1" rowspan="1"><p>tcp: 60001-63000</p>
+</td></tr>
+</table>
+<h2 is-upgraded><img style="width: 624.00px" src="img/f3def33717d1faaa.png"><img style="width: 624.00px" src="img/af8f50d4299ec1be.png"></h2>
+<h2 is-upgraded><strong>Firewall changes for gcp-burst cluster</strong></h2>
+<h3 is-upgraded><strong><code>slurmctl ports:</code></strong></h3>
+<p>We need to open ports on the gcp-burst VPC network so that the gcp-burst cluster can communicate with the on-prem cluster&#39;s slurmctld (tcp:6817).</p>
+<p>From the Google Cloud Console hamburger menu, navigate to [NETWORKING] <strong>VPC network</strong> → <strong>Firewall</strong> panel. Click on <strong>+CREATE FIREWALL RULE</strong> at the top of the page, fill in with following fields and click on <strong>CREATE</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>slurm-network</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Priority</strong></p>
+</td><td colspan="1" rowspan="1"><p>1000</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Direction of traffic</strong></p>
+</td><td colspan="1" rowspan="1"><p>Ingress</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Action to match</strong></p>
+</td><td colspan="1" rowspan="1"><p>Allow</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Targets</strong></p>
+</td><td colspan="1" rowspan="1"><p>Specified target tags</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Target tags</strong></p>
+</td><td colspan="1" rowspan="1"><p>controller</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source Filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>IP ranges</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source IP ranges</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.10.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Second source filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>none</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Specified protocols and ports</strong></p>
+</td><td colspan="1" rowspan="1"><p>tcp: 6817</p>
+</td></tr>
+</table>
+<h2 is-upgraded><img style="width: 624.00px" src="img/d5f2e27cf679c51e.png"><img style="width: 624.00px" src="img/7ff06c59e33a539a.png"></h2>
+<h3 is-upgraded><strong><code>slurmd ports:</code></strong></h3>
+<p>From the Google Cloud Console hamburger menu, navigate to [NETWORKING] <strong>VPC network</strong> → <strong>Firewall</strong> panel. Click on <strong>+CREATE FIREWALL RULE</strong> at the top of the page, fill in with following fields and click on <strong>CREATE</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>slurmd</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Priority</strong></p>
+</td><td colspan="1" rowspan="1"><p>1000</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Direction of traffic</strong></p>
+</td><td colspan="1" rowspan="1"><p>Ingress</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Action to match</strong></p>
+</td><td colspan="1" rowspan="1"><p>Allow</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Targets</strong></p>
+</td><td colspan="1" rowspan="1"><p>Specified target tags</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Target tags</strong></p>
+</td><td colspan="1" rowspan="1"><p>compute</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source Filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>IP ranges</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source IP ranges</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Second source filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>none</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Specified protocols and ports</strong></p>
+</td><td colspan="1" rowspan="1"><p>tcp:6818</p>
+</td></tr>
+</table>
+<h2 is-upgraded><img style="width: 624.00px" src="img/63e4bc04b9521dd0.png"><img style="width: 624.00px" src="img/6b0f2e64882b8f06.png"></h2>
+<h3 is-upgraded><strong><code>srun ports:</code></strong></h3>
+<p>Optionally, if you require the ability to execute cross-cluster srun jobs, or cross-cluster interactive jobs then ports need to be opened for srun to be able to communicate with the slurmd&#39;s on the gcp cluster. Ports also need to be opened for the slurmd&#39;s to be able to talk back to the login nodes on the gcp cluster. During these operations srun opens several ephemeral ports for communications. It&#39;s recommended to define which ports srun can use when using a firewall. This is done by defining SrunPortRange=&lt;IP Range&gt; in both slurm.conf files.</p>
+<p>SrunPortRange=60001-63000</p>
+<p>From the Google Cloud Console hamburger menu, navigate to [NETWORKING] <strong>VPC network</strong> → <strong>Firewall</strong> panel. Click on <strong>+CREATE FIREWALL RULE</strong> at the top of the page, fill in with following fields and click on <strong>CREATE</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>srun</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Priority</strong></p>
+</td><td colspan="1" rowspan="1"><p>1000</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Direction of traffic</strong></p>
+</td><td colspan="1" rowspan="1"><p>Ingress</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Action to match</strong></p>
+</td><td colspan="1" rowspan="1"><p>Allow</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Targets</strong></p>
+</td><td colspan="1" rowspan="1"><p>Specified target tags</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Target tags</strong></p>
+</td><td colspan="1" rowspan="1"><p>compute</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source Filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>IP ranges</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Source IP ranges</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Second source filter</strong></p>
+</td><td colspan="1" rowspan="1"><p>none</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Specified protocols and ports</strong></p>
+</td><td colspan="1" rowspan="1"><p>tcp: 60001-63000</p>
+</td></tr>
+</table>
+<h2 is-upgraded><img style="width: 624.00px" src="img/e06d16318d5fea42.png"><img style="width: 624.00px" src="img/90eb38be0435033e.png"></h2>
+<p>When all is said and done, here are the summaries of the firewall rules for the on-prem and gcp-burst clusters:</p>
+<p class="image-container"><img style="width: 624.00px" src="img/1e20ce3fc0d8c59f.png"><img style="width: 624.00px" src="img/aab21811fd4ebf7e.png"></p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Setting Up Cross-Project VPN" duration="3">
+        <p>The <strong>on-prem</strong> and <strong>gcp-burst</strong> clusters are in their own separate networks. We will set up a VPN to connect the two clusters.  For this set up, it&#39;s simplest if you have two Google Cloud Consoles open, one that has the <strong>on-prem</strong> project selected and the other with the <strong>gcp-burst</strong> project selected. The reason why is because some of the settings, such as <strong>Remote peer IP address</strong> and <strong>IKE pre-shared key</strong>, depend on the on-demand assigned/generated values.</p>
+<p>Let&#39;s create the VPN for the <strong>on-prem</strong> network first (make sure that the Cloud Console has the on-prem project selected). From the Google Cloud Console hamburger menu, navigate to the [NETWORKING] <strong>Hybrid Connectivity</strong> → <strong>VPN</strong> panel.  Click on <strong>Create VPN connection</strong>, select <strong>Classic VPN,</strong> click on <strong>CONTINUE</strong> and fill in the field with the following settings below.  Don&#39;t click on the <strong>CREATE</strong> button yet because we need information from the corresponding <strong>gcp-burst</strong> VPN.</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem-vpn</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Region</strong></p>
+</td><td colspan="1" rowspan="1"><p>us-central1</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>IP address</strong></p>
+</td><td colspan="1" rowspan="1"><p>Create IP address → Name: on-prem-vpn-ip → RESERVE</p>
+<p>(This reserved IP address will be the value for the <strong>gcp-burst </strong>VPN <strong>Remote peer IP address</strong> field)</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Tunnels: Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>on-prem-tunnel-gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Remote peer IP address</strong></p>
+</td><td colspan="1" rowspan="1"><p>(Leave blank for now. You will update this field with the IP address that will be reserved for the gcp-burst VPN)</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>IKE version</strong></p>
+</td><td colspan="1" rowspan="1"><p>IKEv2</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>IKE pre-shared key</strong></p>
+</td><td colspan="1" rowspan="1"><p>Generate and copy</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Routing options: Route-based: Remote network IP range</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.20.0.0/16</p>
+</td></tr>
+</table>
+<p>Shown below are the screenshots for the <strong>on-prem</strong> settings (<strong>I&#39;ve obscured the IKE pre-shared key</strong>)</p>
+<p class="image-container"><img style="width: 624.00px" src="img/bc5d19b07217ffd1.png"><img style="width: 624.00px" src="img/fb4fec0f3336a49.png"></p>
+<p>Next, let&#39;s set up the VPN tunnel on the <strong>gcp-burst</strong> cluster (be sure that the Cloud Console has the gcp-burst project selected). From the Google Cloud Console hamburger menu, navigate to the [NETWORKING] <strong>Hybrid Connectivity</strong> → <strong>VPN</strong> panel.  Click on <strong>Create VPN connection</strong>, select <strong>Classic VPN,</strong> click on <strong>CONTINUE</strong> and fill in the field with the following settings and click on <strong>Create</strong>:</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p><strong>Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst-vpn</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Network</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Region</strong></p>
+</td><td colspan="1" rowspan="1"><p>us-central1</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>IP address</strong></p>
+</td><td colspan="1" rowspan="1"><p>Create IP address → Name: gcp-burst-vpn-ip → RESERVE</p>
+<p>(This reserved IP address will be the value for the <strong>on-prem </strong>VPN <strong>Remote peer IP address</strong> field)</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Tunnels: Name</strong></p>
+</td><td colspan="1" rowspan="1"><p>gcp-burst-tunnel-on-prem</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Remote peer IP address</strong></p>
+</td><td colspan="1" rowspan="1"><p>(enter the IP address that was reserved for the on-prem-vpn)</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>IKE version</strong></p>
+</td><td colspan="1" rowspan="1"><p>IKEv2</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>IKE pre-shared key</strong></p>
+</td><td colspan="1" rowspan="1"><p>Generate and copy</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><strong>Routing options: Route-based: Remote network IP range</strong></p>
+</td><td colspan="1" rowspan="1"><p>10.10.0.0/16</p>
+</td></tr>
+</table>
+<p>Shown below are the screenshots for the <strong>gcp-burst</strong> VPN settings (I have obscured the <strong>IKE pre-shared key</strong>).</p>
+<p class="image-container"><img style="width: 624.00px" src="img/c8c9a542a9b3df3a.png"><img style="width: 624.00px" src="img/a68c1ac92df46f55.png"></p>
+<p>Now that we have the IP address for the <strong>gcp-burst</strong> VPN reserved, copy this and enter into the <strong>Remote peer IP address</strong> field for the <strong>on-prem</strong> VPN settings.  Lastly, the two VPN endpoints need to have the same IKE pre-shared key.  You can either copy the one from the <strong>gcp-burst</strong> endpoint and paste it into the on-prem VPN settings or vice versa.  Finally, click on the <strong>CREATE</strong> button on both Google Cloud Consoles.  If everything goes according to plan, you should see connectivity established at both endpoints.</p>
+<p class="image-container"><img style="width: 624.00px" src="img/a8f058ec9b9300e3.png"><img style="width: 624.00px" src="img/28dd876dbc239b22.png"></p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Configuring Slurm Cluster Accounting" duration="9">
+        <p>In order to federate between the two clusters we need to configure Slurm cluster accounting on our gcp cluster to report to our on-prem Slurm controller.</p>
+<p>For more information about Slurm accounting, see the<a href="https://slurm.schedmd.com/accounting.html" target="_blank">Slurm Accounting</a> page.</p>
+<p>First, we must set both cluster&#39;s slurm.conf files to point to the on-prem&#39;s controller as the &#34;Accounting Storage Host&#34;.</p>
+<p><strong>Log in</strong> to both cluster&#39;s login node. In the on-prem cluster <strong>execute</strong> the following command to retrieve the on-prem&#39;s controller node IP.</p>
+<pre>sudo -i sacctmgr show clusters format=cluster,controlhost,controlport</pre>
+<p>You should see the following output where <strong>10.10.0.5</strong> is the IP of our on-prem&#39;s controller:</p>
+<pre>  Cluster     ControlHost  ControlPort 
+---------- --------------- ------------ 
+   on-prem       10.10.0.5         6820</pre>
+<p>Copy this IP address to your clipboard for use in our next step.</p>
+<p>On the <strong>gcp-burst</strong> cluster&#39;s login node, <strong>open</strong> the slurm.conf using your preferred text editor:</p>
+<pre>sudo vi /apps/slurm/current/etc/slurm.conf</pre>
+<p><strong>Edit</strong> the AccountStorageHost entry to match:</p>
+<pre>AccountingStorageHost=&lt;IP of on-prem&#39;s controller instance&gt;</pre>
+<aside class="warning"><p><strong>Caution</strong>.  If you were paying attention during the <strong>Setting Up Cross-Project Firewall Rules</strong> section, you will recall that we identified the slurmctl port as 6817 but the above command indicates that our <strong>on-prem</strong> Slurm cluster is using port 6820. What is up with that?</p>
+<p>What I believe happened is that the default settings for the Slurm cluster had changed since the introduction of the <a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-federated-on-gcp" target="_blank">Building Federated HPC Clusters with Slurm</a> codelab. Recall that we were leveraging the automations scripts from the <a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a> codelab and nowhere did we explicitly configure the slurmctl port. We have two paths in front of us: (1) go back and configure the firewall rules with the new port or (2) update slurm.conf to use the ports specified in the previously configured firewall rules.</p>
+<p>It is simpler to walk the latter path.  Update the slurm.conf on both the <strong>on-prem</strong> and <strong>gcp-burst</strong> clusters with the following parameters</p>
+<p><code>SlurmctldPort=6817</code></p>
+<p><code>SlurmdPort=6818</code></p>
+<p>These parameters will be picked up when we restart the Slurm controller daemon later.</p>
+</aside>
+<p>Now that we have the gcp cluster pointing to the on-prem cluster we can add the cluster to the on-prem&#39;s Slurm DB, and set up user accounts.</p>
+<p>On the on-prem cluster&#39;s login node,<strong> execute the following command</strong> to add the gcp cluster to the on-prem:</p>
+<pre>sudo -i sacctmgr add cluster gcp-burst</pre>
+<p>Next, run these commands with your cluster name and user to configure your account on the gcp cluster:</p>
+<pre>sudo -i sacctmgr add account=default cluster=gcp
+sudo -i sacctmgr add user &lt;user&gt; account=default cluster=gcp</pre>
+<p>Finally, we must restart the Slurm controller daemon on both clusters. <strong>SSH</strong> into the controller node of both clusters. You may do this either by using the &#34;SSH&#34; button next to the controller node in Google Cloud Console, or by setting up SSH keys from the login1 node by taking advantage of the common /home folder:</p>
+<pre>ssh-keygen -q -f ~/.ssh/id_rsa -N &#34;&#34;
+cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys
+ssh on-prem-controller</pre>
+<p>Once logged into both controller nodes, <strong>execute</strong> the following command on both nodes to restart slurmctld:</p>
+<pre>sudo systemctl restart slurmctld</pre>
+<p>Within a few minutes, the two clusters will report in and will appear in the Slurm accounting. Execute the following command to list clusters:</p>
+<p>sudo -i sacctmgr show clusters format=cluster,controlhost,controlport</p>
+<p>The output should contain both clusters and report IPs for each:</p>
+<pre>  Cluster     ControlHost  ControlPort 
+---------- --------------- ------------ 
+ gcp-burst       10.20.0.4         6817 
+   on-prem       10.10.0.5         6817</pre>
+<p>If the IPs don&#39;t populate immediately please allow a few minutes for the clusters to report in. If you believe there&#39;s an issue, please review the<a href="https://slurm.schedmd.com/troubleshoot.html" target="_blank">Slurm Troubleshooting Guide</a>.</p>
+<p>Log out of the controller nodes, and back into the login nodes to continue the codelab.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Creating Slurm Federation of Clusters" duration="5">
+        <p>Now that we have our Slurm cluster accounting configured, we can create the Slurm federation.</p>
+<p>For more information about Slurm federation, see the<a href="https://slurm.schedmd.com/federation.html" target="_blank">Slurm Federation</a> page.</p>
+<p>We will use the name &#34;cloudburst&#34; for our federation. On the on-prem gcp&#39;s login1 node <strong>execute</strong> the following command:</p>
+<pre>sudo -i sacctmgr add federation starfleet clusters=on-prem,gcp-burst</pre>
+<p>You&#39;ve now created a Slurm federation capable of bursting to Google Cloud Platform! Let&#39;s view the configration to verify it was created correctly:</p>
+<pre>sacctmgr show federation</pre>
+<p>The output should appear as:</p>
+<pre>Federation    Cluster ID             Features     FedState 
+---------- ---------- -- -------------------- ------------ 
+ starfleet  gcp-burst  2                            ACTIVE 
+ starfleet    on-prem  1                            ACTIVE </pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Cloud Bursting from on-prem cluster to gcp-burst cluster" duration="0">
+        <p>Now that we have a federation set up between our on-prem and gcp clusters we can submit jobs that are federated (distributed) across clusters according to whichever cluster is capable of responding to the job request fastest.</p>
+<h2 is-upgraded><strong>Checking Cluster Status</strong></h2>
+<p>To see the resources available in the federation, run <strong>sinfo</strong> with the --federation flag:</p>
+<pre>sinfo --federation</pre>
+<p>The output should appear as:</p>
+<pre>PARTITION CLUSTER  AVAIL  TIMELIMIT  NODES  STATE NODELIST
+test*     on-prem     up   infinite     10  idle~ on-prem-compute-0-[0-9]
+gpu-k80*  gcp-burs    up   infinite     20  idle~ gcp-burst-compute-0-[0-19]
+gpu-v100  gcp-burs    up   infinite     10  idle~ gcp-burst-compute-1-[0-9]
+smp       on-prem     up   infinite     42  idle~ on-prem-compute-1-[0-41]</pre>
+<p>Let&#39;s also check the queues on both of our clusters using <strong>squeue</strong>:</p>
+<pre>squeue --federation</pre>
+<p>You should see the following output:</p>
+<pre>JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)</pre>
+<p>We can see that the queue is empty, and that all nodes are listed as &#34;idle&#34; or &#34;idle~&#34;. The &#34;idle&#34; state signifies that the node up online and idle, ready to have jobs allocated to it. The &#34;idle~&#34; state signifies that the node is offline and does not yet exist in the cloud, but that it could be created if necessary to meet demand.</p>
+<p>Now that our cluster federation is ready, let&#39;s go ahead and submit a job.</p>
+<h2 is-upgraded><strong>Submitting Federated Jobs</strong></h2>
+<p>First, we can submit a job specifically to a cluster we chose using the -M flag in <strong>sbatch</strong>:</p>
+<pre>sbatch -M gcp-burst hostname_batch</pre>
+<aside class="warning"><p><strong>Note:</strong> If you don&#39;t have the hostname_batch script, please refer back to step 6 of the &#34;<a href="https://codelabs.developers.google.com/codelabs/hpc-slurm-on-gcp/#5" target="_blank">Deploy an Auto-Scaling HPC Cluster with Slurm</a>&#34; codelab. You can find a copy of the script there.</p>
+</aside>
+<p>You can now run <strong>squeue</strong> to check the status of the clusters. The -M flag works in squeue as well as sbatch and sinfo. Let&#39;s run squeue with the --federation flag, and a few other options:</p>
+<pre>[kimberlyyellow_gmail_com@on-prem-login0 ~]$ squeue --federation -O jobid,username,timeused,cluster,numnodes,nodelist
+JOBID               USER                TIME                CLUSTER             NODES               NODELIST            
+134217733           kimberlyyellow_gmail0:28                gcp-burst           2                   gcp-burst-compute-0-
+[kimberlyyellow_gmail_com@on-prem-login0 ~]$ 
+</pre>
+<p>You&#39;ll notice that the gcp-burst cluster was allocated this job, and there are two nodes allocated to the job.</p>
+<p>Now let&#39;s check <strong>sinfo</strong> to verify that the gcp cluster is spinning up the necessary nodes to complete the job.</p>
+<pre>kimberlyyellow_gmail_com@on-prem-login0 ~]$ sinfo --federation
+PARTITION CLUSTER  AVAIL  TIMELIMIT  NODES  STATE NODELIST
+gpu-k80*  gcp-burs    up   infinite      2   mix# gcp-burst-compute-0-[0-1]
+test*     on-prem     up   infinite     10  idle~ on-prem-compute-0-[0-9]
+gpu-k80*  gcp-burs    up   infinite     18  idle~ gcp-burst-compute-0-[2-19]
+gpu-v100  gcp-burs    up   infinite     10  idle~ gcp-burst-compute-1-[0-9]
+smp       on-prem     up   infinite     42  idle~ on-prem-compute-1-[0-41]
+[kimberlyyellow_gmail_com@on-prem-login0 ~]$ </pre>
+<p>We can also allow Slurm&#39;s federation to allocate the jobs to whichever cluster is able to respond the fastest by simply submitting the job to the federation we&#39;re now part of:</p>
+<pre>sbatch hostname_batch</pre>
+<p>Once the job is submitted check <strong>squeue</strong> to see where the job was allocated:</p>
+<pre>[kimberlyyellow_gmail_com@on-prem-login0 ~]$ squeue --federation -O jobid,username,timeused,cluster,numnodes,nodelist
+JOBID               USER                TIME                CLUSTER             NODES               NODELIST            
+67108868            kimberlyyellow_gmail0:12                gcp-burst           2                   gcp-burst-compute-0-
+134217733           kimberlyyellow_gmail0:00                gcp-burst           2                                      </pre>
+<p>Submit the job once or twice more to see where Slurm places the job. It may allocate jobs to the on-prem cluster the first or second time, but then it will begin distributing the jobs evenly.</p>
+<p>Congratulations, you&#39;ve created a federated Slurm cluster out of two independent Slurm Clusters, and federated jobs between two auto-scaling clusters! You can use this technique in a variety of environments, including between an existing on-premise cluster and a Google Cloud auto-scaled cluster. Furthermore, you could have multiple clusters with each tailored to any given workload and resource profile in a single federation. You could then use<a href="https://slurm.schedmd.com/accounting.html" target="_blank">Slurm accounting</a> to assign users to cloud-specific partitions, or you might use cluster specification on a per-job basis. All this while transparently allowing users to continue submitting jobs through the same workflow they&#39;re used to, logging into the same Slurm cluster.</p>
+<p>Try testing some more interesting code like a<a href="https://github.com/GoogleCloudPlatform/deploymentmanager-samples/blob/master/examples/v2/htcondor/applications/primes.c" target="_blank">Prime Number Generator</a>, the<a href="http://mvapich.cse.ohio-state.edu/benchmarks/" target="_blank">OSU MPI Benchmarks</a>, or your own code! To learn more about how to customize the code for your usage, and how to run your workloads most affordably, contact the Google Cloud team today through<a href="https://cloud.google.com/solutions/hpc/" target="_blank">Google Cloud&#39;s High Performance Computing Solutions website</a>!</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Wrapping up and reflecting" duration="0">
+        
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+  <script src="//support.google.com/inapp/api.js"></script>
+
+</body>
+</html>
