@@ -4,4 +4,4 @@
 ...
 
 # Contents
--  https://harc-pti.github.io/cloud-bursting-html/GCP-codelab/
+-  <https://harc-pti.github.io/cloud-bursting-html/GCP-codelab/>
